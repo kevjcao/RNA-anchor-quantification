@@ -1,0 +1,6 @@
+# Mack folders
+*.DS_Store
+
+
+# Pycharm folders
+*.idea

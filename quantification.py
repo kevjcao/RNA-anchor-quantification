@@ -5,6 +5,7 @@
 # pip.main(['install', 'cellpose'])
 
 import matplotlib.pyplot as plt
+import cellpose
 from cellpose import models, io, plot, utils
 import tkinter as tk
 from tkinter import filedialog
@@ -12,13 +13,20 @@ import numpy as np
 import re
 import os
 from pathlib import Path
+from glob import glob
 
 # locate directory for batch processing
 root = tk.Tk()
 root.withdraw()
 root.directory = filedialog.askdirectory()
 
+# choose model
+# model_path = filedialog.askopenfilename()
+# root_model = os.path.split(model_path)
+# cellpose.io.add_model(model_path)
+
 stack_dir: Path = Path(root.directory)
+
 for file in stack_dir.glob('*.tif'):
     image_path = root.directory + '/' + file.name
     # create folder to hold cellpose outputs
@@ -27,10 +35,11 @@ for file in stack_dir.glob('*.tif'):
         os.makedirs(cellpose_output)
 
     # read tif into cellpose; channels=[0, 0] for grayscale image
-    model = models.Cellpose(gpu=False, model_type='cyto')
+    # model = models.CellposeModel(gpu=False, pretrained_model=model_path, net_avg=False)
+    # model = models.Cellpose(gpu=False, model_type=root_model[1])
+    model = models.Cellpose(gpu=False, model_type='cyto2')
     img = io.imread(image_path)
-    masks, flows, styles, diams = model.eval(img, diameter=None, channels=[0, 0],
-                                             flow_threshold=0.4, do_3D=False)
+    masks, flows, styles, diams = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
     # save cellpose segmentation as _seg.npy
     io.masks_flows_to_seg(img, masks, flows, diams, image_path)
 
@@ -64,13 +73,23 @@ for file in stack_dir.glob('*.tif'):
     rois_n = np.zeros(len(outlines))
     for i in range(1, len(outlines) + 1):
         f_mask = np.isin(masks, i)
+        # create a new image where mask is applied to original image
         f_slice = f_mask * img
         f_mean = f_slice[f_slice != 0].mean()
         rois_n[i - 1] = f_mean
     roi_mvg = file.name.replace(".tif", ".csv")
     np.savetxt((root.directory + '/cellpose_output/' + roi_mvg), rois_n, delimiter=",")
 
-
-
-
-
+# for file in os.listdir(cellpose_output):
+#
+# cellpose_output_dir: Path = Path(cellpose_output)
+# with open("concat_test_1.csv", "w") as outfile:
+#     for count, file in enumerate(cellpose_output_dir.glob('*.csv')):
+#         with open(file) as in_file:
+#             header = next(in_file)
+#             if count == 0:
+#                 outfile.write(header)
+#                 line = next(in_file)
+#             if not line.startswith("\n"):
+#                 line = line + "\n"
+#             outfile.write(line)

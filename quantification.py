@@ -20,10 +20,10 @@ root = tk.Tk()
 root.withdraw()
 root.directory = filedialog.askdirectory()
 
-# choose model
-# model_path = filedialog.askopenfilename()
-# root_model = os.path.split(model_path)
-# cellpose.io.add_model(model_path)
+## choose model; uncomment for standard models
+model_path = filedialog.askopenfilename()
+root_model = os.path.split(model_path)
+cellpose.io.add_model(model_path)
 
 stack_dir: Path = Path(root.directory)
 
@@ -35,13 +35,17 @@ for file in stack_dir.glob('*.tif'):
         os.makedirs(cellpose_output)
 
     # read tif into cellpose; channels=[0, 0] for grayscale image
-    # model = models.CellposeModel(gpu=False, pretrained_model=model_path, net_avg=False)
-    # model = models.Cellpose(gpu=False, model_type=root_model[1])
-    model = models.Cellpose(gpu=False, model_type='cyto2')
+    model = models.CellposeModel(gpu=False, model_type=root_model[1])
+    # model = models.Cellpose(gpu=False, model_type='cyto2')
     img = io.imread(image_path)
-    masks, flows, styles, diams = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
+
+    ## for custom models omit diam; use following line:
+    masks, flows, styles = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
+
+    ## for standard models, use following lines:
+    # masks, flows, styles, diams = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
     # save cellpose segmentation as _seg.npy
-    io.masks_flows_to_seg(img, masks, flows, diams, image_path)
+    # io.masks_flows_to_seg(img, masks, flows, diams, image_path)
 
     # save segmentation as .txt for imageJ; outlines also used for quantification
     base = os.path.splitext(image_path)[0]
@@ -56,13 +60,15 @@ for file in stack_dir.glob('*.tif'):
     plt.savefig(root.directory + '/cellpose_output/' + seg_file)
     plt.show()
 
+    ## may not be necessary
     # obtain ROIs for each segmented cell; plot red overlay on original image
-    np_seg = re.sub('.tif$', '_seg.npy', image_path)
-    dat = np.load(np_seg, allow_pickle=True).item()
-    outlines = utils.outlines_list(dat['masks'])
+    # np_seg = re.sub('.tif$', '_seg.npy', image_path)
+    # dat = np.load(np_seg, allow_pickle=True).item()
+    # outlines = utils.outlines_list(dat['masks'])
 
     fig2 = plt.figure(figsize=(5, 5))
-    plt.imshow(dat['img'])
+    plt.imshow(img)
+    # plt.imshow(dat['img'])
     for o in outlines:
         plt.plot(o[:, 0], o[:, 1], linewidth=0.5, color='r')
     plt.axis('off')

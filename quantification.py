@@ -10,6 +10,8 @@ from cellpose import models, io, plot, utils
 import tkinter as tk
 from tkinter import filedialog
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import re
 import os
 from pathlib import Path
@@ -20,7 +22,12 @@ root = tk.Tk()
 root.withdraw()
 root.directory = filedialog.askdirectory()
 
-## choose model; uncomment for standard models
+# create folder to hold cellpose outputs
+cellpose_output = root.directory + '/cellpose_output'
+if not os.path.exists(cellpose_output):
+    os.makedirs(cellpose_output)
+
+# choose model; comment out if using standard models
 model_path = filedialog.askopenfilename()
 root_model = os.path.split(model_path)
 cellpose.io.add_model(model_path)
@@ -29,22 +36,16 @@ stack_dir: Path = Path(root.directory)
 
 for file in stack_dir.glob('*.tif'):
     image_path = root.directory + '/' + file.name
-    # create folder to hold cellpose outputs
-    cellpose_output = root.directory + '/cellpose_output'
-    if not os.path.exists(cellpose_output):
-        os.makedirs(cellpose_output)
-
-    # read tif into cellpose; channels=[0, 0] for grayscale image
+    # read tif into cellpose; channels=[0, 0] for grayscale image; use models.Cellpose for standard models
     model = models.CellposeModel(gpu=False, model_type=root_model[1])
     # model = models.Cellpose(gpu=False, model_type='cyto2')
     img = io.imread(image_path)
 
-    ## for custom models omit diam; use following line:
+    ## for custom models use following line:
     masks, flows, styles = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
 
-    ## for standard models, use following lines:
+    ## for standard models use following lines; save cellpose segmentation as _seg.npy:
     # masks, flows, styles, diams = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
-    # save cellpose segmentation as _seg.npy
     # io.masks_flows_to_seg(img, masks, flows, diams, image_path)
 
     # save segmentation as .txt for imageJ; outlines also used for quantification
@@ -86,16 +87,25 @@ for file in stack_dir.glob('*.tif'):
     roi_mvg = file.name.replace(".tif", ".csv")
     np.savetxt((root.directory + '/cellpose_output/' + roi_mvg), rois_n, delimiter=",")
 
-# for file in os.listdir(cellpose_output):
-#
-# cellpose_output_dir: Path = Path(cellpose_output)
-# with open("concat_test_1.csv", "w") as outfile:
-#     for count, file in enumerate(cellpose_output_dir.glob('*.csv')):
-#         with open(file) as in_file:
-#             header = next(in_file)
-#             if count == 0:
-#                 outfile.write(header)
-#                 line = next(in_file)
-#             if not line.startswith("\n"):
-#                 line = line + "\n"
-#             outfile.write(line)
+#create a new file that places all the csv files into one
+compilation_df = []
+filenames = []
+for cp_output in os.listdir(cellpose_output):
+    if cp_output.endswith(".csv"):
+        df = pd.read_csv(os.path.join(cellpose_output, cp_output))
+        df_column = df.iloc[:, 0:1]
+        compilation_df.append(df_column)
+        filenames.append(os.path.splitext(cp_output)[0])
+
+#save the compiled csv file
+compilation_df = pd.concat(compilation_df, axis=1)
+compilation_df.columns = filenames
+compilation_df.to_csv(os.path.join(cellpose_output, 'compiled_cellpose_outputs.csv'), index=False)
+
+plt.figure(figsize=(10,6))
+sns.violinplot(data=compilation_df)
+sns.swarmplot(data=compilation_df, size=4, palette='dark:black')
+plt.title("Cellpose outputs, raw data")
+plt.xlabel("file")
+plt.ylabel("mean grey value")
+plt.show()

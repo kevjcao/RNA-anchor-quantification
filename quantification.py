@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Install cellpose if needed
+## Install cellpose if needed
 # import pip
 # pip.main(['install', 'cellpose'])
 
@@ -12,10 +12,8 @@ from tkinter import filedialog
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import re
 import os
 from pathlib import Path
-from glob import glob
 
 # locate directory for batch processing
 root = tk.Tk()
@@ -33,7 +31,6 @@ root_model = os.path.split(model_path)
 cellpose.io.add_model(model_path)
 
 stack_dir: Path = Path(root.directory)
-
 for file in stack_dir.glob('*.tif'):
     image_path = root.directory + '/' + file.name
     # read tif into cellpose; channels=[0, 0] for grayscale image; use models.Cellpose for standard models
@@ -61,15 +58,8 @@ for file in stack_dir.glob('*.tif'):
     plt.savefig(root.directory + '/cellpose_output/' + seg_file)
     plt.show()
 
-    ## may not be necessary
-    # obtain ROIs for each segmented cell; plot red overlay on original image
-    # np_seg = re.sub('.tif$', '_seg.npy', image_path)
-    # dat = np.load(np_seg, allow_pickle=True).item()
-    # outlines = utils.outlines_list(dat['masks'])
-
     fig2 = plt.figure(figsize=(5, 5))
     plt.imshow(img)
-    # plt.imshow(dat['img'])
     for o in outlines:
         plt.plot(o[:, 0], o[:, 1], linewidth=0.5, color='r')
     plt.axis('off')
@@ -92,7 +82,7 @@ compilation_df = []
 filenames = []
 for cp_output in os.listdir(cellpose_output):
     if cp_output.endswith(".csv"):
-        df = pd.read_csv(os.path.join(cellpose_output, cp_output))
+        df = pd.read_csv(os.path.join(cellpose_output, cp_output), header=None)
         df_column = df.iloc[:, 0:1]
         compilation_df.append(df_column)
         filenames.append(os.path.splitext(cp_output)[0])
@@ -103,9 +93,11 @@ compilation_df.columns = filenames
 compilation_df.to_csv(os.path.join(cellpose_output, 'compiled_cellpose_outputs.csv'), index=False)
 
 plt.figure(figsize=(10,6))
-sns.violinplot(data=compilation_df)
+sns.violinplot(data=compilation_df, inner='quartile', color='skyblue')
 sns.swarmplot(data=compilation_df, size=4, palette='dark:black')
 plt.title("Cellpose outputs, raw data")
-plt.xlabel("file")
-plt.ylabel("mean grey value")
+plt.xlabel("file name")
+if len(compilation_df.columns) > 5:
+    plt.xticks(rotation=45)
+plt.ylabel("mean grey value (au)")
 plt.show()

@@ -26,24 +26,24 @@ if not os.path.exists(cellpose_output):
     os.makedirs(cellpose_output)
 
 # choose model; comment out if using standard models
-model_path = filedialog.askopenfilename()
-root_model = os.path.split(model_path)
-cellpose.io.add_model(model_path)
+# model_path = filedialog.askopenfilename()
+# root_model = os.path.split(model_path)
+# cellpose.io.add_model(model_path)
 
 stack_dir: Path = Path(root.directory)
 for file in stack_dir.glob('*.tif'):
     image_path = root.directory + '/' + file.name
     # read tif into cellpose; channels=[0, 0] for grayscale image; use models.Cellpose for standard models
-    model = models.CellposeModel(gpu=False, model_type=root_model[1])
-    # model = models.Cellpose(gpu=False, model_type='cyto2')
+    # model = models.CellposeModel(gpu=False, model_type=root_model[1])
+    model = models.Cellpose(gpu=False, model_type='cyto2')
     img = io.imread(image_path)
 
     ## for custom models use following line:
-    masks, flows, styles = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
+    # masks, flows, styles = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
 
     ## for standard models use following lines; save cellpose segmentation as _seg.npy:
-    # masks, flows, styles, diams = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
-    # io.masks_flows_to_seg(img, masks, flows, diams, image_path)
+    masks, flows, styles, diams = model.eval(img, diameter=None, channels=[0, 0], flow_threshold=None, do_3D=False)
+    io.masks_flows_to_seg(img, masks, flows, diams, image_path)
 
     # save segmentation as .txt for imageJ; outlines also used for quantification
     base = os.path.splitext(image_path)[0]
@@ -82,22 +82,29 @@ compilation_df = []
 filenames = []
 for cp_output in os.listdir(cellpose_output):
     if cp_output.endswith(".csv"):
-        df = pd.read_csv(os.path.join(cellpose_output, cp_output), header=None)
-        df_column = df.iloc[:, 0:1]
-        compilation_df.append(df_column)
-        filenames.append(os.path.splitext(cp_output)[0])
+        try:
+            df = pd.read_csv(os.path.join(cellpose_output, cp_output), header=None)
+        except pd.errors.EmptyDataError:
+            df = pd.DataFrame([0])
+            df_column = df.iloc[:, 0:1]
+            compilation_df.append(df)
+            filenames.append(os.path.splitext(cp_output)[0])
+        else:
+            df_column = df.iloc[:, 0:1]
+            compilation_df.append(df_column)
+            filenames.append(os.path.splitext(cp_output)[0])
 
 #save the compiled csv file
 compilation_df = pd.concat(compilation_df, axis=1)
 compilation_df.columns = filenames
 compilation_df.to_csv(os.path.join(cellpose_output, 'compiled_cellpose_outputs.csv'), index=False)
 
-plt.figure(figsize=(10,6))
+plt.figure(figsize=(10, 6))
 sns.violinplot(data=compilation_df, inner='quartile', color='skyblue')
 sns.swarmplot(data=compilation_df, size=4, palette='dark:black')
 plt.title("Cellpose outputs, raw data")
 plt.xlabel("file name")
 if len(compilation_df.columns) > 5:
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=90)
 plt.ylabel("mean grey value (au)")
 plt.show()

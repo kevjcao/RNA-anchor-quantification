@@ -51,14 +51,14 @@ for file in stack_dir.glob('*.tif'):
     io.outlines_to_text(base, outlines)
 
     # plot segmentation, mask, and pose outputs
-    fig1 = plt.figure(figsize=(12, 5))
+    fig1 = plt.figure(figsize=(12, 5), dpi=300)
     plot.show_segmentation(fig1, img, masks, flows[0], channels=[0, 0])
     plt.tight_layout()
     seg_file = file.name.replace(".tif", ".png")
     plt.savefig(root.directory + '/cellpose_output/' + seg_file)
     plt.show()
 
-    fig2 = plt.figure(figsize=(5, 5))
+    fig2 = plt.figure(figsize=(5, 5), dpi=300)
     plt.imshow(img)
     for o in outlines:
         plt.plot(o[:, 0], o[:, 1], linewidth=0.5, color='r')
@@ -77,7 +77,7 @@ for file in stack_dir.glob('*.tif'):
     roi_mvg = file.name.replace(".tif", ".csv")
     np.savetxt((root.directory + '/cellpose_output/' + roi_mvg), rois_n, delimiter=",")
 
-#create a new file that places all the csv files into one
+# create a new file that places all the csv files into one
 compilation_df = []
 filenames = []
 for cp_output in os.listdir(cellpose_output):
@@ -94,17 +94,31 @@ for cp_output in os.listdir(cellpose_output):
             compilation_df.append(df_column)
             filenames.append(os.path.splitext(cp_output)[0])
 
-#save the compiled csv file
+# save the compiled csv file
 compilation_df = pd.concat(compilation_df, axis=1)
 compilation_df.columns = filenames
-compilation_df.to_csv(os.path.join(cellpose_output, 'compiled_cellpose_outputs.csv'), index=False)
+compilation_df.to_excel(os.path.join(cellpose_output, 'compiled_cellpose_outputs.xlsx'), index=False)
+df_stats = compilation_df.describe()
 
-plt.figure(figsize=(10, 6))
-sns.violinplot(data=compilation_df, inner='quartile', color='skyblue')
-sns.swarmplot(data=compilation_df, size=4, palette='dark:black')
+# plot the compiled csv files w/ mean & std
+fig3 = plt.figure(figsize=(10, 6), dpi=300)
+sns.violinplot(data=compilation_df, inner='quartile', color='xkcd:light green')
+sns.swarmplot(data=compilation_df, size=2, palette='dark:black')
+for i, column in enumerate(compilation_df.columns):
+    col_mean = compilation_df[column].mean()
+    col_std = compilation_df[column].std()
+    plt.scatter(i, col_mean, s=10, color='red', label='Mean' if i == 0 else '')
+    plt.errorbar(i, col_mean, yerr=col_std, color='black', fmt=' ', capsize=2, label='Std Dev' if i == 0 else '')
+# plt.text()
 plt.title("Cellpose outputs, raw data")
 plt.xlabel("file name")
 if len(compilation_df.columns) > 5:
     plt.xticks(rotation=90)
 plt.ylabel("mean grey value (au)")
+plt.legend()
+plt.tight_layout()
 plt.show()
+
+# plt.figure(figsize=(10,6), dpi=300)
+# plt.scatter(df_stats)
+# plt.show()
